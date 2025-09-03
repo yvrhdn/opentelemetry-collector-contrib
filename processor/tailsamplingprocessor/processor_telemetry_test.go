@@ -324,6 +324,88 @@ func TestMetricsWithComponentID(t *testing.T) {
 	assert.Len(t, cs.AllTraces(), 1)
 }
 
+func TestMetricsWithGroup(t *testing.T) {
+	// prepare
+	s := setupTestTelemetry()
+	b := newSyncIDBatcher()
+	syncBatcher := b.(*syncIDBatcher)
+
+	cfg := Config{
+		DecisionWait: 1,
+		NumTraces:    100,
+		PolicyCfgs: []PolicyCfg{
+			{
+				sharedPolicyCfg: sharedPolicyCfg{
+					Name:  "always",
+					Type:  AlwaysSample,
+					Group: "group-1",
+				},
+			},
+		},
+		Options: []Option{
+			withDecisionBatcher(syncBatcher),
+		},
+	}
+	cs := &consumertest.TracesSink{}
+	ct := s.newSettings()
+	proc, err := newTracesProcessor(t.Context(), ct, cs, cfg)
+	require.NoError(t, err)
+	defer func() {
+		err = proc.Shutdown(t.Context())
+		require.NoError(t, err)
+	}()
+
+	err = proc.Start(t.Context(), componenttest.NewNopHost())
+	require.NoError(t, err)
+
+	// test
+	err = proc.ConsumeTraces(t.Context(), simpleTraces())
+	require.NoError(t, err)
+
+	tsp := proc.(*tailSamplingSpanProcessor)
+	tsp.policyTicker.OnTick() // the first tick always gets an empty batch
+	tsp.policyTicker.OnTick()
+
+	// verify
+	var md metricdata.ResourceMetrics
+	require.NoError(t, s.reader.Collect(t.Context(), &md))
+	require.Equal(t, 8, s.len(md))
+
+	for _, tt := range []struct {
+		opts []metricdatatest.Option
+		m    metricdata.Metrics
+	}{
+		{
+			opts: []metricdatatest.Option{metricdatatest.IgnoreTimestamp()},
+			m: metricdata.Metrics{
+				Name:        "otelcol_processor_tail_sampling_global_count_traces_sampled",
+				Description: "Global count of traces that were sampled or not by at least one policy",
+				Unit:        "{traces}",
+				Data: metricdata.Sum[int64]{
+					IsMonotonic: true,
+					Temporality: metricdata.CumulativeTemporality,
+					DataPoints: []metricdata.DataPoint[int64]{
+						{
+							Attributes: attribute.NewSet(
+								attribute.String("sampled", "true"),
+								attribute.String("decision", "sampled"),
+								attribute.String("group", "group-1"),
+							),
+							Value: 1,
+						},
+					},
+				},
+			},
+		},
+	} {
+		got := s.getMetric(tt.m.Name, md)
+		metricdatatest.AssertEqual(t, tt.m, got, tt.opts...)
+	}
+
+	// sanity check
+	assert.Len(t, cs.AllTraces(), 1)
+}
+
 func TestMetricsCountSampled(t *testing.T) {
 	err := featuregate.GlobalRegistry().Set("processor.tailsamplingprocessor.metricstatcountspanssampled", true)
 	require.NoError(t, err)

@@ -66,6 +66,7 @@ Global count of traces that were sampled or not by at least one policy
 | ---- | ----------- | ------ |
 | sampled | Whether the sampling decision was sampled or not, false can mean either not sampled or dropped | Any Bool |
 | decision | The sampling decision | Str: ``sampled``, ``not_sampled``, ``dropped`` |
+| group | The group name of the policy that made the first sampling decision. | Any Str |
 
 ### otelcol_processor_tail_sampling_new_trace_id_received
 

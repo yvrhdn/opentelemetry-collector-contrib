@@ -27,6 +27,10 @@ attributes:
     enum: [sampled, not_sampled, dropped]
     type: string
 
+  group:
+    description: The group name of the policy that made the first sampling decision.
+    type: string
+
 telemetry:
   metrics:
     processor_tail_sampling_sampling_decision_latency:
@@ -92,7 +96,7 @@ telemetry:
       sum:
         value_type: int
         monotonic: true
-      attributes: [sampled, decision]
+      attributes: [sampled, decision, group]
 
     processor_tail_sampling_sampling_trace_dropped_too_early:
       description: Count of traces that needed to be dropped before the configured wait time

@@ -41,6 +41,8 @@ type policy struct {
 	evaluator sampling.PolicyEvaluator
 	// attribute to use in the telemetry to denote the policy.
 	attribute metric.MeasurementOption
+	// group used for metrics
+	group string
 }
 
 // tailSamplingSpanProcessor handles the incoming trace data and uses the given sampling
@@ -336,6 +338,7 @@ func (tsp *tailSamplingSpanProcessor) loadSamplingPolicy(cfgs []PolicyCfg) error
 
 		p := &policy{
 			name:      cfg.Name,
+			group:     cfg.Group,
 			evaluator: eval,
 			attribute: metric.WithAttributes(attribute.String("policy", uniquePolicyName)),
 		}
@@ -409,8 +412,6 @@ func (tsp *tailSamplingSpanProcessor) samplingPolicyOnTick() {
 		trace.DecisionTime = time.Now()
 
 		decision := tsp.makeDecision(id, trace, metrics)
-
-		tsp.telemetry.ProcessorTailSamplingGlobalCountTracesSampled.Add(tsp.ctx, 1, decisionToAttributes[decision])
 
 		// Sampled or not, remove the batches
 		trace.Lock()
@@ -523,6 +524,13 @@ func (tsp *tailSamplingSpanProcessor) makeDecision(id pcommon.TraceID, trace *sa
 	case sampling.Dropped:
 		metrics.decisionDropped++
 	}
+
+	var opts []metric.AddOption
+	opts = append(opts, decisionToAttributes[finalDecision])
+	if sampledPolicy != nil && sampledPolicy.group != "" {
+		opts = append(opts, metric.WithAttributes(attribute.String("group", sampledPolicy.group)))
+	}
+	tsp.telemetry.ProcessorTailSamplingGlobalCountTracesSampled.Add(tsp.ctx, 1, opts...)
 
 	return finalDecision
 }

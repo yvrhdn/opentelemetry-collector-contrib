@@ -54,6 +54,8 @@ type sharedPolicyCfg struct {
 	Name string `mapstructure:"name"`
 	// Type of the policy this will be used to match the proper configuration of the policy.
 	Type PolicyType `mapstructure:"type"`
+	// Group is an optional field used in metrics. This feature is experimental.
+	Group string `mapstructure:"group"`
 	// Configs for latency filter sampling policy evaluator.
 	LatencyCfg LatencyCfg `mapstructure:"latency"`
 	// Configs for numeric attribute filter sampling policy evaluator.
