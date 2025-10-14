@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"regexp"
+	"slices"
 	"strings"
 
 	"go.opentelemetry.io/collector/client"
@@ -25,8 +26,8 @@ var (
 )
 
 type requestCondition struct {
-	attributeName string
 	compareFunc   func(string) bool
+	attributeName string
 }
 
 func parseRequestCondition(condition string) (*requestCondition, error) {
@@ -88,20 +89,10 @@ func (rc *requestCondition) matchGRPC(ctx context.Context) bool {
 	if !ok {
 		return false
 	}
-	for _, value := range values {
-		if rc.compareFunc(value) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(values, rc.compareFunc)
 }
 
 func (rc *requestCondition) matchHTTP(ctx context.Context) bool {
 	values := client.FromContext(ctx).Metadata.Get(rc.attributeName)
-	for _, value := range values {
-		if rc.compareFunc(value) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(values, rc.compareFunc)
 }

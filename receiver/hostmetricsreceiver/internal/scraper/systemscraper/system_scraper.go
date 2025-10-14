@@ -11,14 +11,14 @@ import (
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/pmetric"
-	"go.opentelemetry.io/collector/receiver"
+	"go.opentelemetry.io/collector/scraper"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver/internal/scraper/systemscraper/internal/metadata"
 )
 
-// scraper for Uptime Metrics
+// scraper for System Metrics
 type systemsScraper struct {
-	settings receiver.Settings
+	settings scraper.Settings
 	config   *Config
 	mb       *metadata.MetricsBuilder
 
@@ -27,8 +27,8 @@ type systemsScraper struct {
 	uptime   func(context.Context) (uint64, error)
 }
 
-// newUptimeScraper creates an Uptime related metric
-func newUptimeScraper(_ context.Context, settings receiver.Settings, cfg *Config) *systemsScraper {
+// newSystemScraper creates an Uptime related metric
+func newSystemScraper(_ context.Context, settings scraper.Settings, cfg *Config) *systemsScraper {
 	return &systemsScraper{settings: settings, config: cfg, bootTime: host.BootTimeWithContext, uptime: host.UptimeWithContext}
 }
 

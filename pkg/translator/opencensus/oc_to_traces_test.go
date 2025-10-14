@@ -22,7 +22,7 @@ import (
 )
 
 func TestOcTraceStateToInternal(t *testing.T) {
-	assert.EqualValues(t, "", ocTraceStateToInternal(nil))
+	assert.Empty(t, ocTraceStateToInternal(nil))
 
 	tracestate := &octrace.Span_Tracestate{
 		Entries: []*octrace.Span_Tracestate_Entry{
@@ -32,26 +32,26 @@ func TestOcTraceStateToInternal(t *testing.T) {
 			},
 		},
 	}
-	assert.EqualValues(t, "abc=def", ocTraceStateToInternal(tracestate))
+	assert.Equal(t, "abc=def", ocTraceStateToInternal(tracestate))
 
 	tracestate.Entries = append(tracestate.Entries,
 		&octrace.Span_Tracestate_Entry{
 			Key:   "123",
 			Value: "4567",
 		})
-	assert.EqualValues(t, "abc=def,123=4567", ocTraceStateToInternal(tracestate))
+	assert.Equal(t, "abc=def,123=4567", ocTraceStateToInternal(tracestate))
 }
 
 func TestInitAttributeMapFromOC(t *testing.T) {
 	attrs := pcommon.NewMap()
 	initAttributeMapFromOC(nil, attrs)
-	assert.EqualValues(t, pcommon.NewMap(), attrs)
+	assert.Equal(t, pcommon.NewMap(), attrs)
 	assert.EqualValues(t, 0, ocAttrsToDroppedAttributes(nil))
 
 	ocAttrs := &octrace.Span_Attributes{}
 	attrs = pcommon.NewMap()
 	initAttributeMapFromOC(ocAttrs, attrs)
-	assert.EqualValues(t, pcommon.NewMap(), attrs)
+	assert.Equal(t, pcommon.NewMap(), attrs)
 	assert.EqualValues(t, 0, ocAttrsToDroppedAttributes(ocAttrs))
 
 	ocAttrs = &octrace.Span_Attributes{
@@ -59,7 +59,7 @@ func TestInitAttributeMapFromOC(t *testing.T) {
 	}
 	attrs = pcommon.NewMap()
 	initAttributeMapFromOC(ocAttrs, attrs)
-	assert.EqualValues(t, pcommon.NewMap(), attrs)
+	assert.Equal(t, pcommon.NewMap(), attrs)
 	assert.EqualValues(t, 123, ocAttrsToDroppedAttributes(ocAttrs))
 
 	ocAttrs = &octrace.Span_Attributes{
@@ -68,7 +68,7 @@ func TestInitAttributeMapFromOC(t *testing.T) {
 	}
 	attrs = pcommon.NewMap()
 	initAttributeMapFromOC(ocAttrs, attrs)
-	assert.EqualValues(t, pcommon.NewMap(), attrs)
+	assert.Equal(t, pcommon.NewMap(), attrs)
 	assert.EqualValues(t, 234, ocAttrsToDroppedAttributes(ocAttrs))
 
 	ocAttrs = &octrace.Span_Attributes{
@@ -96,7 +96,7 @@ func TestInitAttributeMapFromOC(t *testing.T) {
 	attrs = pcommon.NewMap()
 	initAttributeMapFromOC(ocAttrs, attrs)
 
-	assert.EqualValues(t, map[string]any{
+	assert.Equal(t, map[string]any{
 		"abc":       "def",
 		"intval":    int64(345),
 		"boolval":   true,
@@ -183,7 +183,7 @@ func TestOcSpanKindToInternal(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.otlpKind.String(), func(t *testing.T) {
 			got := ocSpanKindToInternal(test.ocKind, test.ocAttrs)
-			assert.EqualValues(t, test.otlpKind, got, "Expected "+test.otlpKind.String()+", got "+got.String())
+			assert.Equal(t, test.otlpKind, got, "Expected "+test.otlpKind.String()+", got "+got.String())
 		})
 	}
 }
@@ -373,7 +373,7 @@ func TestOcToInternal(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert.EqualValues(t, test.td, OCToTraces(test.node, test.resource, test.spans))
+			assert.Equal(t, test.td, OCToTraces(test.node, test.resource, test.spans))
 		})
 	}
 }
@@ -387,14 +387,14 @@ func TestOcSameProcessAsParentSpanToInternal(t *testing.T) {
 	assert.Equal(t, 1, span.Attributes().Len())
 	v, ok := span.Attributes().Get(occonventions.AttributeSameProcessAsParentSpan)
 	assert.True(t, ok)
-	assert.EqualValues(t, pcommon.ValueTypeBool, v.Type())
+	assert.Equal(t, pcommon.ValueTypeBool, v.Type())
 	assert.False(t, v.Bool())
 
 	ocSameProcessAsParentSpanToInternal(wrapperspb.Bool(true), span)
 	assert.Equal(t, 1, span.Attributes().Len())
 	v, ok = span.Attributes().Get(occonventions.AttributeSameProcessAsParentSpan)
 	assert.True(t, ok)
-	assert.EqualValues(t, pcommon.ValueTypeBool, v.Type())
+	assert.Equal(t, pcommon.ValueTypeBool, v.Type())
 	assert.True(t, v.Bool())
 }
 
@@ -402,8 +402,7 @@ func BenchmarkSpansWithAttributesOCToInternal(b *testing.B) {
 	resource := generateOCTestResource()
 	spans := []*octrace.Span{generateSpanWithAttributes(15)}
 
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
+	for b.Loop() {
 		OCToTraces(nil, resource, spans)
 	}
 }
@@ -416,8 +415,7 @@ func BenchmarkSpansWithAttributesUnmarshal(b *testing.B) {
 		b.Fail()
 	}
 
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
+	for b.Loop() {
 		unmarshalOc := &octrace.Span{}
 		if err := proto.Unmarshal(bytes, unmarshalOc); err != nil {
 			b.Fail()
@@ -442,7 +440,7 @@ func generateSpanWithAttributes(length int) *octrace.Span {
 
 	ocSpan2.Attributes.AttributeMap = make(map[string]*octrace.AttributeValue, length)
 	ocAttr := ocSpan2.Attributes.AttributeMap
-	for i := 0; i < length; i++ {
+	for i := range length {
 		ocAttr["span-link-attr_"+strconv.Itoa(i)] = &octrace.AttributeValue{
 			Value: &octrace.AttributeValue_StringValue{
 				StringValue: &octrace.TruncatableString{Value: "span-link-attr-val"},

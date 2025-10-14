@@ -5,7 +5,6 @@ package sapmexporter
 
 import (
 	"compress/gzip"
-	"context"
 	"crypto/rand"
 	"fmt"
 	"io"
@@ -13,7 +12,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/jaegertracing/jaeger/model"
+	"github.com/jaegertracing/jaeger-idl/model/v1"
 	"github.com/klauspost/compress/zstd"
 	splunksapm "github.com/signalfx/sapm-proto/gen"
 	"github.com/stretchr/testify/assert"
@@ -22,6 +21,7 @@ import (
 	"go.opentelemetry.io/collector/exporter/exportertest"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 
+	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/sapmexporter/internal/metadata"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/internal/splunk"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/jaeger"
 )
@@ -37,13 +37,13 @@ func TestCreateTraces(t *testing.T) {
 			AccessTokenPassthrough: true,
 		},
 	}
-	params := exportertest.NewNopSettings()
+	params := exportertest.NewNopSettings(metadata.Type)
 
 	te, err := newSAPMTracesExporter(cfg, params)
 	assert.NoError(t, err)
 	assert.NotNil(t, te, "failed to create trace exporter")
 
-	assert.NoError(t, te.Shutdown(context.Background()), "trace exporter shutdown failed")
+	assert.NoError(t, te.Shutdown(t.Context()), "trace exporter shutdown failed")
 }
 
 func buildTestTraces(setTokenLabel bool) (traces ptrace.Traces) {
@@ -51,7 +51,7 @@ func buildTestTraces(setTokenLabel bool) (traces ptrace.Traces) {
 	rss := traces.ResourceSpans()
 	rss.EnsureCapacity(20)
 
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		rs := rss.AppendEmpty()
 		resource := rs.Resource()
 		resource.Attributes().PutStr("key1", "value1")
@@ -118,7 +118,7 @@ func hasToken(batches []*model.Batch) bool {
 func buildTestTrace() (ptrace.Traces, error) {
 	trace := ptrace.NewTraces()
 	trace.ResourceSpans().EnsureCapacity(2)
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		rs := trace.ResourceSpans().AppendEmpty()
 		resource := rs.Resource()
 		resource.Attributes().PutStr("com.splunk.signalfx.access_token", fmt.Sprintf("TraceAccessToken%v", i))
@@ -196,7 +196,7 @@ func TestSAPMClientTokenUsageAndErrorMarshalling(t *testing.T) {
 					AccessTokenPassthrough: tt.accessTokenPassthrough,
 				},
 			}
-			params := exportertest.NewNopSettings()
+			params := exportertest.NewNopSettings(metadata.Type)
 
 			se, err := newSAPMExporter(cfg, params)
 			assert.NoError(t, err)
@@ -204,7 +204,7 @@ func TestSAPMClientTokenUsageAndErrorMarshalling(t *testing.T) {
 
 			trace, testTraceErr := buildTestTrace()
 			require.NoError(t, testTraceErr)
-			err = se.pushTraceData(context.Background(), trace)
+			err = se.pushTraceData(t.Context(), trace)
 
 			if tt.sendError {
 				require.Error(t, err)
@@ -232,7 +232,7 @@ func TestSAPMClientTokenAccess(t *testing.T) {
 			accessTokenPassthrough: true,
 		},
 		{
-			name:                   "Token in config wihout passthrough",
+			name:                   "Token in config without passthrough",
 			inContext:              false,
 			accessTokenPassthrough: false,
 		},
@@ -264,7 +264,7 @@ func TestSAPMClientTokenAccess(t *testing.T) {
 					AccessTokenPassthrough: tt.accessTokenPassthrough,
 				},
 			}
-			params := exportertest.NewNopSettings()
+			params := exportertest.NewNopSettings(metadata.Type)
 
 			se, err := newSAPMExporter(cfg, params)
 			assert.NoError(t, err)
@@ -273,7 +273,7 @@ func TestSAPMClientTokenAccess(t *testing.T) {
 			trace, testTraceErr := buildTestTrace()
 			require.NoError(t, testTraceErr)
 
-			ctx := context.Background()
+			ctx := t.Context()
 			if tt.inContext {
 				ctx = client.NewContext(
 					ctx,
@@ -360,7 +360,7 @@ func TestCompression(t *testing.T) {
 					http.HandlerFunc(
 						func(w http.ResponseWriter, r *http.Request) {
 							compression := r.Header.Get("Content-Encoding")
-							assert.EqualValues(t, compression, tt.receivedCompression)
+							assert.Equal(t, compression, tt.receivedCompression)
 
 							payload, err := decompress(r.Body, compression)
 							assert.NoError(t, err)
@@ -384,7 +384,7 @@ func TestCompression(t *testing.T) {
 					DisableCompression: tt.configDisableCompression,
 					Compression:        tt.configCompression,
 				}
-				params := exportertest.NewNopSettings()
+				params := exportertest.NewNopSettings(metadata.Type)
 
 				se, err := newSAPMExporter(cfg, params)
 				assert.NoError(t, err)
@@ -392,7 +392,7 @@ func TestCompression(t *testing.T) {
 
 				trace, testTraceErr := buildTestTrace()
 				require.NoError(t, testTraceErr)
-				err = se.pushTraceData(context.Background(), trace)
+				err = se.pushTraceData(t.Context(), trace)
 				require.NoError(t, err)
 			},
 		)

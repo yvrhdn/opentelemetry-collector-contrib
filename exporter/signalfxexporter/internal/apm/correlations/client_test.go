@@ -30,7 +30,7 @@ var (
 	deletePathRegexp = regexp.MustCompile(`/v2/apm/correlate/([^/]+)/([^/]+)/([^/]+)/([^/]+)`) // /dimName/dimValue/{service,environment}/value
 )
 
-func waitForCors(corCh <-chan *request, count, waitSeconds int) []*request { // nolint: unparam
+func waitForCors(corCh <-chan *request, count, waitSeconds int) []*request { //nolint:unparam
 	cors := make([]*request, 0, count)
 	timeout := time.After(time.Duration(waitSeconds) * time.Second)
 
@@ -50,7 +50,7 @@ loop:
 	return cors
 }
 
-func makeHandler(t *testing.T, corCh chan<- *request, forcedRespCode *atomic.Value, forcedRespPayload *atomic.Value) http.HandlerFunc {
+func makeHandler(t *testing.T, corCh chan<- *request, forcedRespCode, forcedRespPayload *atomic.Value) http.HandlerFunc {
 	forcedRespCode.Store(200)
 
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
@@ -133,7 +133,7 @@ func setup(t *testing.T) (CorrelationClient, *httptest.Server, chan *request, *a
 	var forcedRespPayload atomic.Value
 	server := httptest.NewServer(makeHandler(t, serverCh, &forcedRespCode, &forcedRespPayload))
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 
 	serverURL, err := url.Parse(server.URL)
 	if err != nil {

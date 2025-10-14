@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"strconv"
 	"strings"
 	"sync"
@@ -23,6 +24,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/endpointswatcher"
 )
 
 const (
@@ -34,7 +36,7 @@ const (
 )
 
 type cfGardenObserver struct {
-	*observer.EndpointsWatcher
+	*endpointswatcher.EndpointsWatcher
 	config   *Config
 	doneChan chan struct{}
 	logger   *zap.Logger
@@ -61,7 +63,7 @@ func newObserver(config *Config, logger *zap.Logger) (extension.Extension, error
 		apps:       make(map[string]*resource.App),
 		doneChan:   make(chan struct{}),
 	}
-	g.EndpointsWatcher = observer.NewEndpointsWatcher(g, config.RefreshInterval, logger)
+	g.EndpointsWatcher = endpointswatcher.New(g, config.RefreshInterval, logger)
 	return g, nil
 }
 
@@ -73,7 +75,8 @@ func (g *cfGardenObserver) SyncApps() error {
 	g.appMu.Lock()
 	defer g.appMu.Unlock()
 	g.apps = make(map[string]*resource.App)
-	for _, info := range containers {
+	for i := range containers {
+		info := containers[i]
 		appID, ok := info.Properties[propertiesAppIDKey]
 		if !ok {
 			return fmt.Errorf("container properties do not have a `%s` field, required to fetch application labels", propertiesAppIDKey)
@@ -239,9 +242,7 @@ func (g *cfGardenObserver) containerLabels(info garden.ContainerInfo, app *resou
 		g.logger.Warn("not able to parse container tags into labels", zap.Error(err))
 		return nil
 	}
-	for k, v := range tags {
-		labels[k] = v
-	}
+	maps.Copy(labels, tags)
 
 	if app != nil {
 		for k, v := range app.Metadata.Labels {

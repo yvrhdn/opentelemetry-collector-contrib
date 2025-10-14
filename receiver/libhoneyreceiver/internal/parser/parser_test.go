@@ -148,7 +148,7 @@ func TestToPdata(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logs, traces := ToPdata(tt.dataset, tt.events, tt.cfg, *logger)
+			logs, traces, _, _ := ToPdata(tt.dataset, tt.events, tt.cfg, *logger)
 			assert.Equal(t, tt.wantSpans, traces.SpanCount())
 			assert.Equal(t, tt.wantLogs, logs.LogRecordCount())
 		})
@@ -157,13 +157,12 @@ func TestToPdata(t *testing.T) {
 
 // Helper function to verify attributes
 func verifyAttributes(t *testing.T, expected, actual pcommon.Map) {
-	expected.Range(func(k string, v pcommon.Value) bool {
+	for k, v := range expected.All() {
 		got, ok := actual.Get(k)
 		assert.True(t, ok, "missing attribute %s", k)
 		assert.Equal(t, v.Type(), got.Type(), "wrong type for attribute %s", k)
 		assert.Equal(t, v, got, "wrong value for attribute %s", k)
-		return true
-	})
+	}
 }
 
 func TestAddSpanEventsToSpan(t *testing.T) {

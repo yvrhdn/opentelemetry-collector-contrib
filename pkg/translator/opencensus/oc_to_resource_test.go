@@ -37,13 +37,12 @@ func TestOcNodeResourceToInternal(t *testing.T) {
 
 	// Make sure hard-coded fields override same-name values in Attributes.
 	// To do that add Attributes with same-name.
-	expectedAttrs.Range(func(k string, _ pcommon.Value) bool {
+	for k := range expectedAttrs.All() {
 		// Set all except "attr1" which is not a hard-coded field to some bogus values.
 		if !strings.Contains(k, "-attr") {
 			ocNode.Attributes[k] = "this will be overridden 1"
 		}
-		return true
-	})
+	}
 	ocResource.Labels[occonventions.AttributeResourceType] = "this will be overridden 2"
 
 	// Convert again.
@@ -58,8 +57,7 @@ func BenchmarkOcNodeResourceToInternal(b *testing.B) {
 	ocNode := generateOcNode()
 	ocResource := generateOcResource()
 
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
+	for b.Loop() {
 		resource := pcommon.NewResource()
 		ocNodeResourceToInternal(ocNode, ocResource, resource)
 		if ocNode.Identifier.Pid != 123 {
@@ -80,8 +78,7 @@ func BenchmarkOcResourceNodeUnmarshal(b *testing.B) {
 		b.Fail()
 	}
 
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
+	for b.Loop() {
 		unmarshalOc := &agenttracepb.ExportTraceServiceRequest{}
 		if err := proto.Unmarshal(bytes, unmarshalOc); err != nil {
 			b.Fail()

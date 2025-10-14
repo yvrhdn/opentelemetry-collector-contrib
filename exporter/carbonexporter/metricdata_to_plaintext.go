@@ -165,7 +165,7 @@ func formatHistogramDataPoints(
 
 		bounds := dp.ExplicitBounds().AsRaw()
 		carbonBounds := make([]string, len(bounds)+1)
-		for i := 0; i < len(bounds); i++ {
+		for i := range bounds {
 			carbonBounds[i] = formatFloatForLabel(bounds[i])
 		}
 		carbonBounds[len(carbonBounds)-1] = infinityCarbonValue
@@ -259,7 +259,7 @@ func buildPath(name string, attributes pcommon.Map) string {
 	defer writerPool.Put(buf)
 
 	buf.WriteString(name)
-	attributes.Range(func(k string, v pcommon.Value) bool {
+	for k, v := range attributes.All() {
 		value := v.AsString()
 		if value == "" {
 			value = tagValueEmptyPlaceholder
@@ -268,8 +268,7 @@ func buildPath(name string, attributes pcommon.Map) string {
 		buf.WriteString(sanitizeTagKey(k))
 		buf.WriteString(tagKeyValueSeparator)
 		buf.WriteString(value)
-		return true
-	})
+	}
 
 	return buf.String()
 }

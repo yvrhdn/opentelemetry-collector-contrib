@@ -105,7 +105,7 @@ func concurrencyTest(t *testing.T, numBatches, newBatchesInitialCapacity, batchC
 	// https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/9126
 	concurrencyLimiter := make(chan struct{}, 128)
 	defer close(concurrencyLimiter)
-	for i := 0; i < len(ids); i++ {
+	for i := range ids {
 		wg.Add(1)
 		concurrencyLimiter <- struct{}{}
 		go func(id pcommon.TraceID) {
@@ -129,21 +129,21 @@ func concurrencyTest(t *testing.T, numBatches, newBatchesInitialCapacity, batchC
 		}
 	}
 
-	require.Equal(t, len(ids), len(got), "Batcher got incorrect count of traces from batches")
+	require.Len(t, got, len(ids), "Batcher got incorrect count of traces from batches")
 
 	idSeen := make(map[[16]byte]bool, len(ids))
 	for _, id := range got {
 		idSeen[id] = true
 	}
 
-	for i := 0; i < len(ids); i++ {
+	for i := range ids {
 		require.True(t, idSeen[ids[i]], "want id %v but id was not seen", ids[i])
 	}
 }
 
 func generateSequentialIDs(numIDs uint64) []pcommon.TraceID {
 	ids := make([]pcommon.TraceID, numIDs)
-	for i := uint64(0); i < numIDs; i++ {
+	for i := range numIDs {
 		traceID := [16]byte{}
 		binary.BigEndian.PutUint64(traceID[:8], 0)
 		binary.BigEndian.PutUint64(traceID[8:], i)

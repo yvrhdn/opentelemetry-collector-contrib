@@ -49,7 +49,7 @@ func HardFailedPutRecordsOperation(r *kinesis.PutRecordsInput) (*kinesis.PutReco
 		&types.ResourceNotFoundException{Message: aws.String("testing incorrect kinesis configuration")}
 }
 
-func TransiantPutRecordsOperation(recoverAfter int) func(_ *kinesis.PutRecordsInput) (*kinesis.PutRecordsOutput, error) {
+func TransientPutRecordsOperation(recoverAfter int) func(_ *kinesis.PutRecordsInput) (*kinesis.PutRecordsOutput, error) {
 	attempt := 0
 	return func(r *kinesis.PutRecordsInput) (*kinesis.PutRecordsOutput, error) {
 		if attempt < recoverAfter {
@@ -74,11 +74,11 @@ func TestBatchedExporter(t *testing.T) {
 	}{
 		{name: "Successful put to kinesis", PutRecordsOP: SuccessfulPutRecordsOperation, shouldErr: false, isPermanent: false},
 		{name: "Invalid kinesis configuration", PutRecordsOP: HardFailedPutRecordsOperation, shouldErr: true, isPermanent: true},
-		{name: "Test throttled kinesis operation", PutRecordsOP: TransiantPutRecordsOperation(2), shouldErr: true, isPermanent: false},
+		{name: "Test throttled kinesis operation", PutRecordsOP: TransientPutRecordsOperation(2), shouldErr: true, isPermanent: false},
 	}
 
 	bt := batch.New()
-	for i := 0; i < 500; i++ {
+	for range 500 {
 		assert.NoError(t, bt.AddRecord([]byte("foobar"), "fixed-key"))
 	}
 
@@ -92,7 +92,7 @@ func TestBatchedExporter(t *testing.T) {
 			require.NoError(t, err, "Must not error when creating BatchedExporter")
 			require.NotNil(t, be, "Must have a valid client to use")
 
-			err = be.Put(context.Background(), bt)
+			err = be.Put(t.Context(), bt)
 			if !tc.shouldErr {
 				assert.NoError(t, err, "Must not have returned an error for this test case")
 				return

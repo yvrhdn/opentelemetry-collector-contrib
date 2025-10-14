@@ -9,7 +9,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/jaegertracing/jaeger/proto-gen/api_v2"
+	"github.com/jaegertracing/jaeger-idl/proto-gen/api_v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -25,7 +25,7 @@ func TestSamplingManager_GetSamplingStrategy(t *testing.T) {
 	require.NoError(t, err)
 	defer s.GracefulStop()
 	manager := NewConfigManager(conn)
-	resp, err := manager.GetSamplingStrategy(context.Background(), "any")
+	resp, err := manager.GetSamplingStrategy(t.Context(), "any")
 	require.NoError(t, err)
 	assert.Equal(t, &api_v2.SamplingStrategyResponse{StrategyType: api_v2.SamplingStrategyType_PROBABILISTIC}, resp)
 }
@@ -35,7 +35,7 @@ func TestSamplingManager_GetSamplingStrategy_error(t *testing.T) {
 	t.Cleanup(func() { require.NoError(t, conn.Close()) })
 	require.NoError(t, err)
 	manager := NewConfigManager(conn)
-	resp, err := manager.GetSamplingStrategy(context.Background(), "any")
+	resp, err := manager.GetSamplingStrategy(t.Context(), "any")
 	require.Nil(t, resp)
 	assert.ErrorContains(t, err, "failed to get sampling strategy")
 }

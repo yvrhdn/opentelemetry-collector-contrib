@@ -6,7 +6,6 @@
 package mongodbatlasreceiver
 
 import (
-	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -23,6 +22,7 @@ import (
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/golden"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatatest/plogtest"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/mongodbatlasreceiver/internal/metadata"
 )
 
 func TestAccessLogsIntegration(t *testing.T) {
@@ -58,8 +58,8 @@ func TestAccessLogsIntegration(t *testing.T) {
 	fact := NewFactory()
 
 	recv, err := fact.CreateLogs(
-		context.Background(),
-		receivertest.NewNopSettings(),
+		t.Context(),
+		receivertest.NewNopSettings(metadata.Type),
 		&Config{
 			ControllerConfig: scraperhelper.NewDefaultControllerConfig(),
 			Logs: LogConfig{
@@ -84,14 +84,14 @@ func TestAccessLogsIntegration(t *testing.T) {
 	require.True(t, ok)
 	rcvr.accessLogs.client = &mockClient
 
-	err = recv.Start(context.Background(), componenttest.NewNopHost())
+	err = recv.Start(t.Context(), componenttest.NewNopHost())
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
 		return sink.LogRecordCount() > 0
 	}, 5*time.Second, 10*time.Millisecond)
 
-	err = recv.Shutdown(context.Background())
+	err = recv.Shutdown(t.Context())
 	require.NoError(t, err)
 
 	logs := sink.AllLogs()[0]

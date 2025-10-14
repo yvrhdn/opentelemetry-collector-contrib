@@ -7,8 +7,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"testing"
 
 	"github.com/shirou/gopsutil/v4/common"
@@ -18,8 +20,8 @@ import (
 	"go.opentelemetry.io/collector/component/componenttest"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/pmetric"
-	"go.opentelemetry.io/collector/receiver/receivertest"
 	"go.opentelemetry.io/collector/scraper/scrapererror"
+	"go.opentelemetry.io/collector/scraper/scrapertest"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/internal/filter/filterset"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver/internal"
@@ -81,12 +83,12 @@ func TestScrape(t *testing.T) {
 				IncludeVirtualFS:     true,
 				IncludeFSTypes:       FSTypeMatchConfig{Config: filterset.Config{MatchType: filterset.Strict}, FSTypes: []string{"tmpfs"}},
 			},
-			partitionsFunc: func(_ context.Context, includeVirtual bool) (paritions []disk.PartitionStat, err error) {
-				paritions = append(paritions, disk.PartitionStat{Device: "root-device", Fstype: "ext4"})
+			partitionsFunc: func(_ context.Context, includeVirtual bool) (partitions []disk.PartitionStat, err error) {
+				partitions = append(partitions, disk.PartitionStat{Device: "root-device", Fstype: "ext4"})
 				if includeVirtual {
-					paritions = append(paritions, disk.PartitionStat{Device: "shm", Fstype: "tmpfs"})
+					partitions = append(partitions, disk.PartitionStat{Device: "shm", Fstype: "tmpfs"})
 				}
-				return paritions, err
+				return partitions, err
 			},
 			usageFunc: func(context.Context, string) (*disk.UsageStat, error) {
 				return &disk.UsageStat{}, nil
@@ -267,7 +269,7 @@ func TestScrape(t *testing.T) {
 			newErrRegex: "^error creating exclude_fs_types filter:",
 		},
 		{
-			name: "Invalid Include Moountpoints Filter",
+			name: "Invalid Include Mountpoints Filter",
 			config: Config{
 				MetricsBuilderConfig: metadata.DefaultMetricsBuilderConfig(),
 				IncludeMountPoints:   MountPointMatchConfig{MountPoints: []string{"test"}},
@@ -275,7 +277,7 @@ func TestScrape(t *testing.T) {
 			newErrRegex: "^error creating include_mount_points filter:",
 		},
 		{
-			name: "Invalid Exclude Moountpoints Filter",
+			name: "Invalid Exclude Mountpoints Filter",
 			config: Config{
 				MetricsBuilderConfig: metadata.DefaultMetricsBuilderConfig(),
 				ExcludeMountPoints:   MountPointMatchConfig{MountPoints: []string{"test"}},
@@ -388,12 +390,10 @@ func TestScrape(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			envMap := common.EnvMap{}
-			for k, v := range test.osEnv {
-				envMap[k] = v
-			}
-			ctx := context.WithValue(context.Background(), common.EnvKey, envMap)
+			maps.Copy(envMap, test.osEnv)
+			ctx := context.WithValue(t.Context(), common.EnvKey, envMap)
 			test.config.SetRootPath(test.rootPath)
-			scraper, err := newFileSystemScraper(ctx, receivertest.NewNopSettings(), &test.config)
+			scraper, err := newFileSystemScraper(ctx, scrapertest.NewNopSettings(metadata.Type), &test.config)
 			if test.newErrRegex != "" {
 				require.Error(t, err)
 				require.Regexp(t, test.newErrRegex, err)
@@ -526,11 +526,5 @@ func assertFileSystemUsageMetricHasUnixSpecificStateLabels(t *testing.T, metric 
 }
 
 func isUnix() bool {
-	for _, unixOS := range []string{"linux", "darwin", "freebsd", "openbsd", "solaris"} {
-		if runtime.GOOS == unixOS {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains([]string{"linux", "darwin", "freebsd", "openbsd", "solaris"}, runtime.GOOS)
 }

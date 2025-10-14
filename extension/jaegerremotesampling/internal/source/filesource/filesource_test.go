@@ -6,7 +6,6 @@ package filesource
 
 import (
 	"bytes"
-	"context"
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
@@ -19,7 +18,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jaegertracing/jaeger/proto-gen/api_v2"
+	"github.com/jaegertracing/jaeger-idl/proto-gen/api_v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -124,24 +123,24 @@ func TestStrategyStoreWithFile(t *testing.T) {
 	require.NoError(t, err)
 	message := logs.FilterMessage("No sampling strategies source provided, using defaults")
 	assert.Equal(t, 1, message.Len(), "Expected No sampling strategies provided log message")
-	s, err := provider.GetSamplingStrategy(context.Background(), "foo")
+	s, err := provider.GetSamplingStrategy(t.Context(), "foo")
 	require.NoError(t, err)
-	assert.EqualValues(t, makeResponse(api_v2.SamplingStrategyType_PROBABILISTIC, 0.001), *s)
+	assert.Equal(t, makeResponse(api_v2.SamplingStrategyType_PROBABILISTIC, 0.001), *s)
 
 	// Test reading strategies from a file
 	provider, err = NewFileSource(Options{StrategiesFile: "fixtures/strategies.json"}, logger)
 	require.NoError(t, err)
-	s, err = provider.GetSamplingStrategy(context.Background(), "foo")
+	s, err = provider.GetSamplingStrategy(t.Context(), "foo")
 	require.NoError(t, err)
-	assert.EqualValues(t, makeResponse(api_v2.SamplingStrategyType_PROBABILISTIC, 0.8), *s)
+	assert.Equal(t, makeResponse(api_v2.SamplingStrategyType_PROBABILISTIC, 0.8), *s)
 
-	s, err = provider.GetSamplingStrategy(context.Background(), "bar")
+	s, err = provider.GetSamplingStrategy(t.Context(), "bar")
 	require.NoError(t, err)
-	assert.EqualValues(t, makeResponse(api_v2.SamplingStrategyType_RATE_LIMITING, 5), *s)
+	assert.Equal(t, makeResponse(api_v2.SamplingStrategyType_RATE_LIMITING, 5), *s)
 
-	s, err = provider.GetSamplingStrategy(context.Background(), "default")
+	s, err = provider.GetSamplingStrategy(t.Context(), "default")
 	require.NoError(t, err)
-	assert.EqualValues(t, makeResponse(api_v2.SamplingStrategyType_PROBABILISTIC, 0.5), *s)
+	assert.Equal(t, makeResponse(api_v2.SamplingStrategyType_PROBABILISTIC, 0.5), *s)
 }
 
 func TestStrategyStoreWithURL(t *testing.T) {
@@ -153,21 +152,21 @@ func TestStrategyStoreWithURL(t *testing.T) {
 	require.NoError(t, err)
 	message := logs.FilterMessage("No sampling strategies found or URL is unavailable, using defaults")
 	assert.Equal(t, 1, message.Len(), "Expected No sampling strategies found log message.")
-	s, err := provider.GetSamplingStrategy(context.Background(), "foo")
+	s, err := provider.GetSamplingStrategy(t.Context(), "foo")
 	require.NoError(t, err)
-	assert.EqualValues(t, makeResponse(api_v2.SamplingStrategyType_PROBABILISTIC, 0.001), *s)
+	assert.Equal(t, makeResponse(api_v2.SamplingStrategyType_PROBABILISTIC, 0.001), *s)
 
 	// Test downloading strategies from a URL.
 	provider, err = NewFileSource(Options{StrategiesFile: mockServer.URL}, logger)
 	require.NoError(t, err)
 
-	s, err = provider.GetSamplingStrategy(context.Background(), "foo")
+	s, err = provider.GetSamplingStrategy(t.Context(), "foo")
 	require.NoError(t, err)
-	assert.EqualValues(t, makeResponse(api_v2.SamplingStrategyType_PROBABILISTIC, 0.8), *s)
+	assert.Equal(t, makeResponse(api_v2.SamplingStrategyType_PROBABILISTIC, 0.8), *s)
 
-	s, err = provider.GetSamplingStrategy(context.Background(), "bar")
+	s, err = provider.GetSamplingStrategy(t.Context(), "bar")
 	require.NoError(t, err)
-	assert.EqualValues(t, makeResponse(api_v2.SamplingStrategyType_RATE_LIMITING, 5), *s)
+	assert.Equal(t, makeResponse(api_v2.SamplingStrategyType_RATE_LIMITING, 5), *s)
 }
 
 func TestPerOperationSamplingStrategies(t *testing.T) {
@@ -195,7 +194,7 @@ func TestPerOperationSamplingStrategies(t *testing.T) {
 
 		expected := makeResponse(api_v2.SamplingStrategyType_PROBABILISTIC, 0.8)
 
-		s, err := provider.GetSamplingStrategy(context.Background(), "foo")
+		s, err := provider.GetSamplingStrategy(t.Context(), "foo")
 		require.NoError(t, err)
 		assert.Equal(t, api_v2.SamplingStrategyType_PROBABILISTIC, s.StrategyType)
 		assert.Equal(t, *expected.ProbabilisticSampling, *s.ProbabilisticSampling)
@@ -216,7 +215,7 @@ func TestPerOperationSamplingStrategies(t *testing.T) {
 
 		expected = makeResponse(api_v2.SamplingStrategyType_RATE_LIMITING, 5)
 
-		s, err = provider.GetSamplingStrategy(context.Background(), "bar")
+		s, err = provider.GetSamplingStrategy(t.Context(), "bar")
 		require.NoError(t, err)
 		assert.Equal(t, api_v2.SamplingStrategyType_RATE_LIMITING, s.StrategyType)
 		assert.Equal(t, *expected.RateLimitingSampling, *s.RateLimitingSampling)
@@ -236,7 +235,7 @@ func TestPerOperationSamplingStrategies(t *testing.T) {
 		assert.Equal(t, "op7", opSampling.PerOperationStrategies[4].Operation)
 		assert.InDelta(t, 1.0, opSampling.PerOperationStrategies[4].ProbabilisticSampling.SamplingRate, 0.01)
 
-		s, err = provider.GetSamplingStrategy(context.Background(), "default")
+		s, err = provider.GetSamplingStrategy(t.Context(), "default")
 		require.NoError(t, err)
 		expectedRsp := makeResponse(api_v2.SamplingStrategyType_PROBABILISTIC, 0.5)
 		expectedRsp.OperationSampling = &api_v2.PerOperationSamplingStrategies{
@@ -262,7 +261,7 @@ func TestPerOperationSamplingStrategies(t *testing.T) {
 				},
 			},
 		}
-		assert.EqualValues(t, expectedRsp, *s)
+		assert.Equal(t, expectedRsp, *s)
 	}
 }
 
@@ -276,7 +275,7 @@ func TestMissingServiceSamplingStrategyTypes(t *testing.T) {
 
 	expected := makeResponse(api_v2.SamplingStrategyType_PROBABILISTIC, defaultSamplingProbability)
 
-	s, err := provider.GetSamplingStrategy(context.Background(), "foo")
+	s, err := provider.GetSamplingStrategy(t.Context(), "foo")
 	require.NoError(t, err)
 	assert.Equal(t, api_v2.SamplingStrategyType_PROBABILISTIC, s.StrategyType)
 	assert.Equal(t, *expected.ProbabilisticSampling, *s.ProbabilisticSampling)
@@ -290,7 +289,7 @@ func TestMissingServiceSamplingStrategyTypes(t *testing.T) {
 
 	expected = makeResponse(api_v2.SamplingStrategyType_PROBABILISTIC, defaultSamplingProbability)
 
-	s, err = provider.GetSamplingStrategy(context.Background(), "bar")
+	s, err = provider.GetSamplingStrategy(t.Context(), "bar")
 	require.NoError(t, err)
 	assert.Equal(t, api_v2.SamplingStrategyType_PROBABILISTIC, s.StrategyType)
 	assert.Equal(t, *expected.ProbabilisticSampling, *s.ProbabilisticSampling)
@@ -304,9 +303,9 @@ func TestMissingServiceSamplingStrategyTypes(t *testing.T) {
 	assert.Equal(t, "op5", opSampling.PerOperationStrategies[1].Operation)
 	assert.InDelta(t, 0.4, opSampling.PerOperationStrategies[1].ProbabilisticSampling.SamplingRate, 0.01)
 
-	s, err = provider.GetSamplingStrategy(context.Background(), "default")
+	s, err = provider.GetSamplingStrategy(t.Context(), "default")
 	require.NoError(t, err)
-	assert.EqualValues(t, makeResponse(api_v2.SamplingStrategyType_PROBABILISTIC, 0.5), *s)
+	assert.Equal(t, makeResponse(api_v2.SamplingStrategyType_PROBABILISTIC, 0.5), *s)
 }
 
 func TestParseStrategy(t *testing.T) {
@@ -335,7 +334,7 @@ func TestParseStrategy(t *testing.T) {
 	for _, test := range tests {
 		tt := test
 		t.Run("", func(t *testing.T) {
-			assert.EqualValues(t, tt.expected, *provider.parseStrategy(&tt.strategy.strategy))
+			assert.Equal(t, tt.expected, *provider.parseStrategy(&tt.strategy.strategy))
 		})
 	}
 	assert.Empty(t, logs.Len())
@@ -343,18 +342,19 @@ func TestParseStrategy(t *testing.T) {
 	// Test nonexistent strategy type
 	actual := *provider.parseStrategy(&strategy{Type: "blah", Param: 3.5})
 	expected := makeResponse(api_v2.SamplingStrategyType_PROBABILISTIC, defaultSamplingProbability)
-	assert.EqualValues(t, expected, actual)
+	assert.Equal(t, expected, actual)
 	message := logs.FilterMessage("Failed to parse sampling strategy")
 	assert.Equal(t, 1, message.Len(), "Expected Failed to parse sampling strategy log message.")
 }
 
 func makeResponse(samplerType api_v2.SamplingStrategyType, param float64) (resp api_v2.SamplingStrategyResponse) {
 	resp.StrategyType = samplerType
-	if samplerType == api_v2.SamplingStrategyType_PROBABILISTIC {
+	switch samplerType {
+	case api_v2.SamplingStrategyType_PROBABILISTIC:
 		resp.ProbabilisticSampling = &api_v2.ProbabilisticSamplingStrategy{
 			SamplingRate: param,
 		}
-	} else if samplerType == api_v2.SamplingStrategyType_RATE_LIMITING {
+	case api_v2.SamplingStrategyType_RATE_LIMITING:
 		resp.RateLimitingSampling = &api_v2.RateLimitingSamplingStrategy{
 			MaxTracesPerSecond: int32(param),
 		}
@@ -372,11 +372,11 @@ func TestDeepCopy(t *testing.T) {
 	cp, err := deepCopy(s)
 	require.NoError(t, err)
 	assert.NotSame(t, cp, s)
-	assert.EqualValues(t, cp, s)
+	assert.Equal(t, cp, s)
 }
 
 func TestAutoUpdateStrategyWithFile(t *testing.T) {
-	tempFile, _ := os.CreateTemp("", "for_go_test_*.json")
+	tempFile, _ := os.CreateTemp(t.TempDir(), "for_go_test_*.json")
 	require.NoError(t, tempFile.Close())
 	defer func() {
 		require.NoError(t, os.Remove(tempFile.Name()))
@@ -397,9 +397,9 @@ func TestAutoUpdateStrategyWithFile(t *testing.T) {
 	defer provider.Close()
 
 	// confirm baseline value
-	s, err := provider.GetSamplingStrategy(context.Background(), "foo")
+	s, err := provider.GetSamplingStrategy(t.Context(), "foo")
 	require.NoError(t, err)
-	assert.EqualValues(t, makeResponse(api_v2.SamplingStrategyType_PROBABILISTIC, 0.8), *s)
+	assert.Equal(t, makeResponse(api_v2.SamplingStrategyType_PROBABILISTIC, 0.8), *s)
 
 	// verify that reloading is a no-op
 	value := provider.reloadSamplingStrategy(provider.samplingStrategyLoader(dstFile), string(srcBytes))
@@ -410,15 +410,15 @@ func TestAutoUpdateStrategyWithFile(t *testing.T) {
 	require.NoError(t, os.WriteFile(dstFile, []byte(newStr), 0o600))
 
 	// wait for reload timer
-	for i := 0; i < 1000; i++ { // wait up to 1sec
-		s, err = provider.GetSamplingStrategy(context.Background(), "foo")
+	for range 1000 { // wait up to 1sec
+		s, err = provider.GetSamplingStrategy(t.Context(), "foo")
 		require.NoError(t, err)
 		if s.ProbabilisticSampling != nil && s.ProbabilisticSampling.SamplingRate == 0.9 {
 			break
 		}
 		time.Sleep(1 * time.Millisecond)
 	}
-	assert.EqualValues(t, makeResponse(api_v2.SamplingStrategyType_PROBABILISTIC, 0.9), *s)
+	assert.Equal(t, makeResponse(api_v2.SamplingStrategyType_PROBABILISTIC, 0.9), *s)
 }
 
 func TestAutoUpdateStrategyWithURL(t *testing.T) {
@@ -432,9 +432,9 @@ func TestAutoUpdateStrategyWithURL(t *testing.T) {
 	defer provider.Close()
 
 	// confirm baseline value
-	s, err := provider.GetSamplingStrategy(context.Background(), "foo")
+	s, err := provider.GetSamplingStrategy(t.Context(), "foo")
 	require.NoError(t, err)
-	assert.EqualValues(t, makeResponse(api_v2.SamplingStrategyType_PROBABILISTIC, 0.8), *s)
+	assert.Equal(t, makeResponse(api_v2.SamplingStrategyType_PROBABILISTIC, 0.8), *s)
 
 	// verify that reloading in no-op
 	value := provider.reloadSamplingStrategy(
@@ -450,19 +450,19 @@ func TestAutoUpdateStrategyWithURL(t *testing.T) {
 	}
 
 	// wait for reload timer
-	for i := 0; i < 1000; i++ { // wait up to 1sec
-		s, err = provider.GetSamplingStrategy(context.Background(), "foo")
+	for range 1000 { // wait up to 1sec
+		s, err = provider.GetSamplingStrategy(t.Context(), "foo")
 		require.NoError(t, err)
 		if s.ProbabilisticSampling != nil && s.ProbabilisticSampling.SamplingRate == 0.9 {
 			break
 		}
 		time.Sleep(1 * time.Millisecond)
 	}
-	assert.EqualValues(t, makeResponse(api_v2.SamplingStrategyType_PROBABILISTIC, 0.9), *s)
+	assert.Equal(t, makeResponse(api_v2.SamplingStrategyType_PROBABILISTIC, 0.9), *s)
 }
 
 func TestAutoUpdateStrategyErrors(t *testing.T) {
-	tempFile, _ := os.CreateTemp("", "for_go_test_*.json")
+	tempFile, _ := os.CreateTemp(t.TempDir(), "for_go_test_*.json")
 	require.NoError(t, tempFile.Close())
 	defer func() {
 		_ = os.Remove(tempFile.Name())
@@ -513,7 +513,7 @@ func TestServiceNoPerOperationStrategies(t *testing.T) {
 
 	for _, service := range []string{"ServiceA", "ServiceB"} {
 		t.Run(service, func(t *testing.T) {
-			strategy, err := provider.GetSamplingStrategy(context.Background(), service)
+			strategy, err := provider.GetSamplingStrategy(t.Context(), service)
 			require.NoError(t, err)
 			strategyJSON, err := json.MarshalIndent(strategy, "", "  ")
 			require.NoError(t, err)
@@ -546,7 +546,7 @@ func TestServiceNoPerOperationStrategiesDeprecatedBehavior(t *testing.T) {
 
 	for _, service := range []string{"ServiceA", "ServiceB"} {
 		t.Run(service, func(t *testing.T) {
-			strategy, err := provider.GetSamplingStrategy(context.Background(), service)
+			strategy, err := provider.GetSamplingStrategy(t.Context(), service)
 			require.NoError(t, err)
 			strategyJSON, err := json.MarshalIndent(strategy, "", "  ")
 			require.NoError(t, err)

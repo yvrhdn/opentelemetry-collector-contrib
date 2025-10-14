@@ -4,7 +4,6 @@
 package snmpreceiver // import "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/snmpreceiver"
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -25,7 +24,7 @@ func TestNewFactory(t *testing.T) {
 			desc: "creates a new factory with correct type",
 			testFunc: func(t *testing.T) {
 				factory := NewFactory()
-				require.EqualValues(t, metadata.Type, factory.Type())
+				require.Equal(t, metadata.Type, factory.Type())
 			},
 		},
 		{
@@ -65,8 +64,8 @@ func TestNewFactory(t *testing.T) {
 					},
 				}
 				_, err := factory.CreateMetrics(
-					context.Background(),
-					receivertest.NewNopSettings(),
+					t.Context(),
+					receivertest.NewNopSettings(metadata.Type),
 					cfg,
 					consumertest.NewNop(),
 				)
@@ -78,8 +77,8 @@ func TestNewFactory(t *testing.T) {
 			testFunc: func(t *testing.T) {
 				factory := NewFactory()
 				_, err := factory.CreateMetrics(
-					context.Background(),
-					receivertest.NewNopSettings(),
+					t.Context(),
+					receivertest.NewNopSettings(metadata.Type),
 					nil,
 					consumertest.NewNop(),
 				)
@@ -103,8 +102,8 @@ func TestNewFactory(t *testing.T) {
 					},
 				}
 				_, err := factory.CreateMetrics(
-					context.Background(),
-					receivertest.NewNopSettings(),
+					t.Context(),
+					receivertest.NewNopSettings(metadata.Type),
 					cfg,
 					consumertest.NewNop(),
 				)
@@ -129,8 +128,8 @@ func TestNewFactory(t *testing.T) {
 					},
 				}
 				_, err := factory.CreateMetrics(
-					context.Background(),
-					receivertest.NewNopSettings(),
+					t.Context(),
+					receivertest.NewNopSettings(metadata.Type),
 					cfg,
 					consumertest.NewNop(),
 				)
@@ -155,8 +154,8 @@ func TestNewFactory(t *testing.T) {
 					},
 				}
 				_, err := factory.CreateMetrics(
-					context.Background(),
-					receivertest.NewNopSettings(),
+					t.Context(),
+					receivertest.NewNopSettings(metadata.Type),
 					cfg,
 					consumertest.NewNop(),
 				)
@@ -179,8 +178,8 @@ func TestNewFactory(t *testing.T) {
 					},
 				}
 				_, err := factory.CreateMetrics(
-					context.Background(),
-					receivertest.NewNopSettings(),
+					t.Context(),
+					receivertest.NewNopSettings(metadata.Type),
 					cfg,
 					consumertest.NewNop(),
 				)
@@ -203,8 +202,8 @@ func TestNewFactory(t *testing.T) {
 					},
 				}
 				_, err := factory.CreateMetrics(
-					context.Background(),
-					receivertest.NewNopSettings(),
+					t.Context(),
+					receivertest.NewNopSettings(metadata.Type),
 					cfg,
 					consumertest.NewNop(),
 				)
@@ -227,8 +226,8 @@ func TestNewFactory(t *testing.T) {
 					},
 				}
 				_, err := factory.CreateMetrics(
-					context.Background(),
-					receivertest.NewNopSettings(),
+					t.Context(),
+					receivertest.NewNopSettings(metadata.Type),
 					cfg,
 					consumertest.NewNop(),
 				)
@@ -251,8 +250,8 @@ func TestNewFactory(t *testing.T) {
 					},
 				}
 				_, err := factory.CreateMetrics(
-					context.Background(),
-					receivertest.NewNopSettings(),
+					t.Context(),
+					receivertest.NewNopSettings(metadata.Type),
 					cfg,
 					consumertest.NewNop(),
 				)

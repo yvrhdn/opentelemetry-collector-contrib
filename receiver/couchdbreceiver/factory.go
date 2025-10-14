@@ -28,7 +28,7 @@ func NewFactory() receiver.Factory {
 
 func createDefaultConfig() component.Config {
 	clientConfig := confighttp.NewDefaultClientConfig()
-	clientConfig.TLSSetting = configtls.ClientConfig{}
+	clientConfig.TLS = configtls.ClientConfig{}
 	clientConfig.Endpoint = defaultEndpoint
 	clientConfig.Timeout = 1 * time.Minute
 	return &Config{
@@ -51,7 +51,7 @@ func createMetricsReceiver(
 		return nil, err
 	}
 
-	return scraperhelper.NewScraperControllerReceiver(
+	return scraperhelper.NewMetricsController(
 		&cfg.ControllerConfig, params, consumer,
 		scraperhelper.AddScraper(metadata.Type, s),
 	)

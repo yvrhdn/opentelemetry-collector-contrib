@@ -13,7 +13,7 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/jaegertracing/jaeger/proto-gen/api_v2"
+	"github.com/jaegertracing/jaeger-idl/proto-gen/api_v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/component/componenttest"
@@ -38,8 +38,8 @@ func TestStartAndStopHTTP(t *testing.T) {
 	require.NotNil(t, s)
 
 	// test
-	assert.NoError(t, s.Start(context.Background(), componenttest.NewNopHost()))
-	assert.NoError(t, s.Shutdown(context.Background()))
+	assert.NoError(t, s.Start(t.Context(), componenttest.NewNopHost()))
+	assert.NoError(t, s.Shutdown(t.Context()))
 }
 
 func TestEndpointsAreWired(t *testing.T) {

@@ -58,7 +58,7 @@ func Test_batchTimeSeries(t *testing.T) {
 	// run tests
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			state := newBatchTimeSericesState()
+			state := newBatchTimeServicesState()
 			requests, err := batchTimeSeries(tt.tsMap, tt.maxBatchByteSize, nil, state)
 			if tt.returnErr {
 				assert.Error(t, err)
@@ -89,14 +89,14 @@ func Test_batchTimeSeriesUpdatesStateForLargeBatches(t *testing.T) {
 	// Benchmark for large data sizes
 	// First allocate 100k time series
 	tsArray := make([]*prompb.TimeSeries, 0, 100000)
-	for i := 0; i < 100000; i++ {
+	for range 100000 {
 		ts := getTimeSeries(labels, sample1, sample2, sample3)
 		tsArray = append(tsArray, ts)
 	}
 
 	tsMap1 := getTimeseriesMap(tsArray)
 
-	state := newBatchTimeSericesState()
+	state := newBatchTimeServicesState()
 	requests, err := batchTimeSeries(tsMap1, 1000000, nil, state)
 
 	assert.NoError(t, err)
@@ -119,7 +119,7 @@ func Benchmark_batchTimeSeries(b *testing.B) {
 	// Benchmark for large data sizes
 	// First allocate 100k time series
 	tsArray := make([]*prompb.TimeSeries, 0, 100000)
-	for i := 0; i < 100000; i++ {
+	for range 100000 {
 		ts := getTimeSeries(labels, sample1, sample2, sample3)
 		tsArray = append(tsArray, ts)
 	}
@@ -127,11 +127,10 @@ func Benchmark_batchTimeSeries(b *testing.B) {
 	tsMap1 := getTimeseriesMap(tsArray)
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	state := newBatchTimeSericesState()
+	state := newBatchTimeServicesState()
 	// Run batchTimeSeries 100 times with a 1mb max request size
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		requests, err := batchTimeSeries(tsMap1, 1000000, nil, state)
 		assert.NoError(b, err)
 		assert.Len(b, requests, 18)
@@ -240,7 +239,7 @@ func TestEnsureTimeseriesPointsAreSortedByTimestamp(t *testing.T) {
 	for ti, ts := range got.Timeseries {
 		for i := range ts.Samples {
 			si := ts.Samples[i]
-			for j := 0; j < i; j++ {
+			for j := range i {
 				sj := ts.Samples[j]
 				assert.LessOrEqual(t, sj.Timestamp, si.Timestamp, "Timeseries[%d]: Sample[%d].Timestamp(%d) > Sample[%d].Timestamp(%d)",
 					ti, j, sj.Timestamp, i, si.Timestamp)

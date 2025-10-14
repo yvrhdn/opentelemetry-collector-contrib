@@ -4,7 +4,6 @@
 package cloudfoundryreceiver
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -24,7 +23,7 @@ import (
 func TestDefaultValidMetricsReceiver(t *testing.T) {
 	factory := NewFactory()
 	cfg := factory.CreateDefaultConfig().(*Config)
-	params := receivertest.NewNopSettings()
+	params := receivertest.NewNopSettings(metadata.Type)
 
 	receiver, err := newCloudFoundryMetricsReceiver(
 		params,
@@ -36,7 +35,7 @@ func TestDefaultValidMetricsReceiver(t *testing.T) {
 	require.NotNil(t, receiver, "receiver creation failed")
 
 	// Test start
-	ctx := context.Background()
+	ctx := t.Context()
 	err = receiver.Start(ctx, componenttest.NewNopHost())
 	require.NoError(t, err)
 
@@ -49,7 +48,7 @@ func TestDefaultValidMetricsReceiver(t *testing.T) {
 func TestDefaultValidLogsReceiver(t *testing.T) {
 	factory := NewFactory()
 	cfg := factory.CreateDefaultConfig().(*Config)
-	params := receivertest.NewNopSettings()
+	params := receivertest.NewNopSettings(metadata.Type)
 
 	receiver, err := newCloudFoundryLogsReceiver(
 		params,
@@ -61,7 +60,7 @@ func TestDefaultValidLogsReceiver(t *testing.T) {
 	require.NotNil(t, receiver, "receiver creation failed")
 
 	// Test start
-	ctx := context.Background()
+	ctx := t.Context()
 	err = receiver.Start(ctx, componenttest.NewNopHost())
 	require.NoError(t, err)
 

@@ -8,7 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
+	"runtime"
 	"strconv"
 	"sync"
 	"testing"
@@ -16,29 +16,27 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/snappy"
+	"github.com/prometheus/prometheus/config"
 	"github.com/prometheus/prometheus/prompb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/component/componenttest"
 	"go.opentelemetry.io/collector/config/confighttp"
 	"go.opentelemetry.io/collector/config/configretry"
-	"go.opentelemetry.io/collector/config/configtelemetry"
 	"go.opentelemetry.io/collector/exporter/exportertest"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 
+	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusremotewriteexporter/internal/metadata"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal/testdata"
 )
 
 // Test everything works when there is more than one goroutine calling PushMetrics.
 // Today we only use 1 worker per exporter, but the intention of this test is to future-proof in case it changes.
 func Test_PushMetricsConcurrent(t *testing.T) {
-	if os.Getenv("ImageOs") == "win25" && os.Getenv("GITHUB_ACTIONS") == "true" {
-		t.Skip("Skipping test on Windows 2025 GH runners, see https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/37104")
-	}
 	n := 1000
 	ms := make([]pmetric.Metrics, n)
 	testIDKey := "test_id"
-	for i := 0; i < n; i++ {
+	for i := range n {
 		m := testdata.GenerateMetricsOneMetric()
 		dps := m.ResourceMetrics().At(0).ScopeMetrics().At(0).Metrics().At(0).Sum().DataPoints()
 		for j := 0; j < dps.Len(); j++ {
@@ -75,17 +73,18 @@ func Test_PushMetricsConcurrent(t *testing.T) {
 		ts := wr.Timeseries[0]
 		foundLabel := false
 		for _, label := range ts.Labels {
-			if label.Name == testIDKey {
-				id, err := strconv.Atoi(label.Value)
-				assert.NoError(t, err)
-				mu.Lock()
-				_, ok := received[id]
-				assert.False(t, ok) // fail if we already saw it
-				received[id] = ts
-				mu.Unlock()
-				foundLabel = true
-				break
+			if label.Name != testIDKey {
+				continue
 			}
+			id, err := strconv.Atoi(label.Value)
+			assert.NoError(t, err)
+			mu.Lock()
+			_, ok := received[id]
+			assert.False(t, ok) // fail if we already saw it
+			received[id] = ts
+			mu.Unlock()
+			foundLabel = true
+			break
 		}
 		assert.True(t, foundLabel)
 		w.WriteHeader(http.StatusOK)
@@ -109,23 +108,19 @@ func Test_PushMetricsConcurrent(t *testing.T) {
 		ClientConfig:      clientConfig,
 		MaxBatchSizeBytes: 3000000,
 		RemoteWriteQueue:  RemoteWriteQueue{NumConsumers: 1},
-		TargetInfo: &TargetInfo{
+		TargetInfo: TargetInfo{
 			Enabled: true,
 		},
-		CreatedMetric: &CreatedMetric{
-			Enabled: false,
-		},
-		BackOffConfig: retrySettings,
+		BackOffConfig:       retrySettings,
+		RemoteWriteProtoMsg: config.RemoteWriteProtoMsgV1,
 	}
 
 	assert.NotNil(t, cfg)
-	set := exportertest.NewNopSettings()
-	set.MetricsLevel = configtelemetry.LevelBasic
-
+	set := exportertest.NewNopSettings(metadata.Type)
 	prwe, nErr := newPRWExporter(cfg, set)
 
 	require.NoError(t, nErr)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	require.NoError(t, prwe.Start(ctx, componenttest.NewNopHost()))
 	defer func() {
@@ -137,15 +132,22 @@ func Test_PushMetricsConcurrent(t *testing.T) {
 		resp, checkRequestErr := http.Get(server.URL)
 		require.NoError(c, checkRequestErr)
 		assert.NoError(c, resp.Body.Close())
-	}, 5*time.Second, 100*time.Millisecond)
+	}, 15*time.Second, 100*time.Millisecond)
 
 	var wg sync.WaitGroup
 	wg.Add(n)
+	maxConcurrentGoroutines := runtime.NumCPU() * 4
+	semaphore := make(chan struct{}, maxConcurrentGoroutines)
 	for _, m := range ms {
+		semaphore <- struct{}{}
 		go func() {
+			defer func() {
+				<-semaphore
+				wg.Done()
+			}()
+
 			err := prwe.PushMetrics(ctx, m)
 			assert.NoError(t, err)
-			wg.Done()
 		}()
 	}
 	wg.Wait()

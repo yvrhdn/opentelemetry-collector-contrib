@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cenkalti/backoff/v4"
+	"github.com/cenkalti/backoff/v5"
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/collector/config/configretry"
 	"go.opentelemetry.io/collector/exporter/exporterhelper"
@@ -28,11 +28,14 @@ func TestCreateDefaultConfig(t *testing.T) {
 		Port:     514,
 		Network:  "tcp",
 		Protocol: "rfc5424",
-		QueueSettings: exporterhelper.QueueConfig{
-			Enabled:      false,
-			NumConsumers: 10,
-			QueueSize:    1000,
-		},
+		QueueSettings: func() exporterhelper.QueueBatchConfig {
+			queue := exporterhelper.NewDefaultQueueConfig()
+			queue.Enabled = false
+			queue.NumConsumers = 10
+			queue.QueueSize = 1000
+			queue.Sizer = exporterhelper.RequestSizerTypeRequests
+			return queue
+		}(),
 		BackOffConfig: configretry.BackOffConfig{
 			Enabled:             true,
 			InitialInterval:     5 * time.Second,

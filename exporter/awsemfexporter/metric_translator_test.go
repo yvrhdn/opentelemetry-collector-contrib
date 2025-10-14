@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/pmetric"
-	conventions "go.opentelemetry.io/collector/semconv/v1.27.0"
+	conventions "go.opentelemetry.io/otel/semconv/v1.27.0"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
@@ -25,8 +25,8 @@ import (
 func createTestResourceMetrics() pmetric.ResourceMetrics {
 	rm := pmetric.NewResourceMetrics()
 	rm.Resource().Attributes().PutStr(occonventions.AttributeExporterVersion, "SomeVersion")
-	rm.Resource().Attributes().PutStr(conventions.AttributeServiceName, "myServiceName")
-	rm.Resource().Attributes().PutStr(conventions.AttributeServiceNamespace, "myServiceNS")
+	rm.Resource().Attributes().PutStr(string(conventions.ServiceNameKey), "myServiceName")
+	rm.Resource().Attributes().PutStr(string(conventions.ServiceNamespaceKey), "myServiceNS")
 	rm.Resource().Attributes().PutStr("ClusterName", "myCluster")
 	rm.Resource().Attributes().PutStr("PodName", "myPod")
 	rm.Resource().Attributes().PutStr(attributeReceiver, prometheusReceiver)
@@ -79,7 +79,7 @@ func createTestResourceMetrics() pmetric.ResourceMetrics {
 	q2.SetQuantile(1)
 	q2.SetValue(5)
 
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		m = sm.Metrics().AppendEmpty()
 		m.SetName("spanCounter")
 		m.SetDescription("Counting all the spans")
@@ -160,7 +160,7 @@ func hashMetricSlice(metricSlice []cWMetricInfo) []string {
 	// Convert to string for easier sorting
 	stringified := make([]string, len(metricSlice))
 	for i, v := range metricSlice {
-		stringified[i] = fmt.Sprint(v.Name) + "," + fmt.Sprint(v.Unit) + "," + fmt.Sprint(v.StorageResolution)
+		stringified[i] = fmt.Sprintf("%s,%s,%d", v.Name, v.Unit, v.StorageResolution)
 	}
 	// Sort across metrics for equality checking
 	sort.Strings(stringified)
@@ -170,7 +170,7 @@ func hashMetricSlice(metricSlice []cWMetricInfo) []string {
 // assertDimsEqual asserts whether dimension sets are equal
 // (i.e. has same sets of dimensions), regardless of order.
 func assertDimsEqual(t *testing.T, expected, actual [][]string) {
-	assert.Equal(t, len(expected), len(actual))
+	assert.Len(t, actual, len(expected))
 	expectedDimensions := normalizeDimensionality(expected)
 	actualDimensions := normalizeDimensionality(actual)
 	assert.Equal(t, expectedDimensions, actualDimensions)
@@ -208,7 +208,7 @@ func assertCWMeasurementEqual(t *testing.T, expected, actual cWMeasurement) {
 	assert.Equal(t, expected.Namespace, actual.Namespace)
 
 	// Check metrics
-	assert.Equal(t, len(expected.Metrics), len(actual.Metrics))
+	assert.Len(t, actual.Metrics, len(expected.Metrics))
 	expectedHashSlice := hashMetricSlice(expected.Metrics)
 	actualHashSlice := hashMetricSlice(actual.Metrics)
 	assert.Equal(t, expectedHashSlice, actualHashSlice)
@@ -219,7 +219,7 @@ func assertCWMeasurementEqual(t *testing.T, expected, actual cWMeasurement) {
 
 // assertCWMeasurementSliceEqual asserts whether CW Measurements are equal, regardless of order.
 func assertCWMeasurementSliceEqual(t *testing.T, expected, actual []cWMeasurement) {
-	assert.Equal(t, len(expected), len(actual))
+	assert.Len(t, actual, len(expected))
 	seen := make([]bool, len(expected))
 	for _, actualMeasurement := range actual {
 		hasMatch := false
@@ -239,7 +239,7 @@ func assertCWMeasurementSliceEqual(t *testing.T, expected, actual []cWMeasuremen
 func assertCWMetricsEqual(t *testing.T, expected, actual *cWMetrics) {
 	assert.Equal(t, expected.timestampMs, actual.timestampMs)
 	assert.Equal(t, expected.fields, actual.fields)
-	assert.Equal(t, len(expected.measurements), len(actual.measurements))
+	assert.Len(t, actual.measurements, len(expected.measurements))
 	assertCWMeasurementSliceEqual(t, expected.measurements, actual.measurements)
 }
 
@@ -258,8 +258,8 @@ func TestTranslateOtToGroupedMetric(t *testing.T) {
 	ilm.Scope().SetName("cloudwatch-lib")
 
 	noNamespaceMetric := createTestResourceMetrics()
-	noNamespaceMetric.Resource().Attributes().Remove(conventions.AttributeServiceNamespace)
-	noNamespaceMetric.Resource().Attributes().Remove(conventions.AttributeServiceName)
+	noNamespaceMetric.Resource().Attributes().Remove(string(conventions.ServiceNamespaceKey))
+	noNamespaceMetric.Resource().Attributes().Remove(string(conventions.ServiceNameKey))
 
 	counterSumMetrics := map[string]*metricInfo{
 		"spanCounter": {
@@ -348,16 +348,16 @@ func TestTranslateOtToGroupedMetric(t *testing.T) {
 
 			for _, v := range groupedMetrics {
 				assert.Equal(t, tc.expectedNamespace, v.metadata.namespace)
-				switch {
-				case v.metadata.metricDataType == pmetric.MetricTypeSum:
+				switch v.metadata.metricDataType {
+				case pmetric.MetricTypeSum:
 					assert.Len(t, v.metrics, 2)
 					assert.Equal(t, tc.counterLabels, v.labels)
 					assert.Equal(t, counterSumMetrics, v.metrics)
-				case v.metadata.metricDataType == pmetric.MetricTypeGauge:
+				case pmetric.MetricTypeGauge:
 					assert.Len(t, v.metrics, 2)
 					assert.Equal(t, tc.counterLabels, v.labels)
 					assert.Equal(t, counterGaugeMetrics, v.metrics)
-				case v.metadata.metricDataType == pmetric.MetricTypeHistogram:
+				case pmetric.MetricTypeHistogram:
 					assert.Len(t, v.metrics, 1)
 					assert.Equal(t, tc.timerLabels, v.labels)
 					assert.Equal(t, timerMetrics, v.metrics)
@@ -370,7 +370,7 @@ func TestTranslateOtToGroupedMetric(t *testing.T) {
 
 	t.Run("No metrics", func(t *testing.T) {
 		rm := pmetric.NewResourceMetrics()
-		rm.Resource().Attributes().PutStr(conventions.AttributeServiceName, "myServiceName")
+		rm.Resource().Attributes().PutStr(string(conventions.ServiceNameKey), "myServiceName")
 		rm.Resource().Attributes().PutStr(occonventions.AttributeExporterVersion, "SomeVersion")
 		groupedMetrics := make(map[any]*groupedMetric)
 		err := translator.translateOTelToGroupedMetric(rm, groupedMetrics, config)
@@ -1452,7 +1452,7 @@ func TestGroupedMetricToCWMeasurementsWithFilters(t *testing.T) {
 
 			cWMeasurements := groupedMetricToCWMeasurementsWithFilters(groupedMetric, config)
 			assert.NotNil(t, cWMeasurements)
-			assert.Equal(t, len(tc.expectedMeasurements), len(cWMeasurements))
+			assert.Len(t, cWMeasurements, len(tc.expectedMeasurements))
 			assertCWMeasurementSliceEqual(t, tc.expectedMeasurements, cWMeasurements)
 		})
 	}
@@ -2005,8 +2005,7 @@ func BenchmarkTranslateOtToGroupedMetricWithInstrLibrary(b *testing.B) {
 	translator := newMetricTranslator(*config)
 	defer require.NoError(b, translator.Shutdown())
 
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
+	for b.Loop() {
 		groupedMetric := make(map[any]*groupedMetric)
 		err := translator.translateOTelToGroupedMetric(rm, groupedMetric, config)
 		assert.NoError(b, err)
@@ -2028,8 +2027,7 @@ func BenchmarkTranslateOtToGroupedMetricWithoutConfigReplacePattern(b *testing.B
 	translator := newMetricTranslator(*config)
 	defer require.NoError(b, translator.Shutdown())
 
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
+	for b.Loop() {
 		groupedMetrics := make(map[any]*groupedMetric)
 		err := translator.translateOTelToGroupedMetric(rm, groupedMetrics, config)
 		assert.NoError(b, err)
@@ -2051,8 +2049,7 @@ func BenchmarkTranslateOtToGroupedMetricWithConfigReplaceWithResource(b *testing
 	translator := newMetricTranslator(*config)
 	defer require.NoError(b, translator.Shutdown())
 
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
+	for b.Loop() {
 		groupedMetrics := make(map[any]*groupedMetric)
 		err := translator.translateOTelToGroupedMetric(rm, groupedMetrics, config)
 		assert.NoError(b, err)
@@ -2074,8 +2071,7 @@ func BenchmarkTranslateOtToGroupedMetricWithConfigReplaceWithLabel(b *testing.B)
 	translator := newMetricTranslator(*config)
 	defer require.NoError(b, translator.Shutdown())
 
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
+	for b.Loop() {
 		groupedMetrics := make(map[any]*groupedMetric)
 		err := translator.translateOTelToGroupedMetric(rm, groupedMetrics, config)
 		assert.NoError(b, err)
@@ -2092,8 +2088,7 @@ func BenchmarkTranslateOtToGroupedMetricWithoutInstrLibrary(b *testing.B) {
 	translator := newMetricTranslator(*config)
 	defer require.NoError(b, translator.Shutdown())
 
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
+	for b.Loop() {
 		groupedMetrics := make(map[any]*groupedMetric)
 		err := translator.translateOTelToGroupedMetric(rm, groupedMetrics, config)
 		assert.NoError(b, err)
@@ -2129,8 +2124,7 @@ func BenchmarkTranslateGroupedMetricToCWMetric(b *testing.B) {
 		DimensionRollupOption: zeroAndSingleDimensionRollup,
 	}
 
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
+	for b.Loop() {
 		translateGroupedMetricToCWMetric(groupedMetric, config)
 	}
 }
@@ -2171,8 +2165,7 @@ func BenchmarkTranslateGroupedMetricToCWMetricWithFiltering(b *testing.B) {
 		DimensionRollupOption: zeroAndSingleDimensionRollup,
 	}
 
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
+	for b.Loop() {
 		translateGroupedMetricToCWMetric(groupedMetric, config)
 	}
 }
@@ -2198,8 +2191,7 @@ func BenchmarkTranslateCWMetricToEMF(b *testing.B) {
 		measurements: []cWMeasurement{cwMeasurement},
 	}
 
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
+	for b.Loop() {
 		_, err := translateCWMetricToEMF(met, &Config{})
 		require.NoError(b, err)
 	}
